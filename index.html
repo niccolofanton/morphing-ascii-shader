@@ -226,21 +226,9 @@
   </style>
 
   <!--
-    Import-map: three.js, postprocessing e tweakpane come ES modules da CDN jsdelivr.
-    "postprocessing" importa internamente da "three", quindi "three" e obbligatorio qui.
-    "tweakpane" e il pannello dei controlli live.
-    URL verificati (HTTP 200).
+    Dipendenze (three, postprocessing, tweakpane) risolte da Vite via node_modules
+    a partire dai bare import in src/. Setup: `npm install`, dev: `npm run dev`.
   -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/",
-      "postprocessing": "https://cdn.jsdelivr.net/npm/postprocessing@6.36.3/build/index.js",
-      "tweakpane": "https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.js"
-    }
-  }
-  </script>
 </head>
 <body>
   <canvas id="scene"></canvas>

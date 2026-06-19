@@ -1,3 +1,5 @@
 .DS_Store
 .playwright-mcp/
 *.log
+node_modules/
+dist/

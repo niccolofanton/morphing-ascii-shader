@@ -1,0 +1,20 @@
+{
+  "name": "evoling-aschii-shader",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Real-time ASCII/halftone video shader — three.js + pmndrs/postprocessing",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "postprocessing": "6.36.3",
+    "three": "0.161.0",
+    "tweakpane": "4.0.5"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
