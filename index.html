@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASCII Shader - postprocessing + three.js</title>
+
+  <!-- Branding: font Geist (stesso delle altre demo). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #fff;
+      -webkit-user-select: none;
+      user-select: none;
+      font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    /* Canvas a tutta finestra. */
+    #scene {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    /* Il video sorgente resta nascosto: lo usiamo solo come texture WebGL. */
+    #video {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #hint {
+      position: fixed;
+      left: 12px;
+      bottom: 10px;
+      color: rgba(120, 255, 120, 0.6);
+      font-family: "Courier New", monospace;
+      font-size: 12px;
+      z-index: 5;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* =========================================================================
+       BRANDING / UI in basso (ripreso dalle demo porsche-shader / particles-shaders)
+       Barra glass con firma autore + nome demo + selettore (pills) + indicatore.
+       ========================================================================= */
+
+    /* ===== Container: card "frosted glass" (materiale vibrancy stile Apple) =====
+       Un'unica superficie traslucida chiara con blur+saturazione, sollevata dallo sfondo
+       bianco da un'ombra morbida e un hairline. Funziona su qualunque sfondo (chiaro o scuro)
+       perche il materiale resta chiaro: il testo scuro resta sempre leggibile. */
+    .bottom-ui {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+      padding: 14px 16px 16px;
+      border-radius: 26px;
+      /* Vero materiale "frosted glass" Apple: bianco poco opaco -> il contenuto dietro
+         traspare SFOCATO e colorato grazie al blur forte + saturazione (vibrancy). */
+      background: rgba(255, 255, 255, 0.48);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow:
+        0 16px 48px rgba(0, 0, 0, 0.18),
+        0 2px 8px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.65);
+      opacity: 0;
+      animation: bottomFadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
+      max-width: calc(100vw - 48px);
+    }
+    @keyframes bottomFadeUp { to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    .bottom-ui { transform: translateX(-50%) translateY(8px); }
+
+    /* ===== Header row ===== */
+    .bottom-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 0 4px;
+    }
+    .brand-left { display: flex; flex-direction: column; gap: 3px; }
+    .brand-author {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(0, 0, 0, 0.42);
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+    .brand-author:hover { color: rgba(0, 0, 0, 0.7); }
+    .brand-main {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(0, 0, 0, 0.82);
+    }
+
+    /* ===== Bottoni icona (play/pausa, settings) ===== */
+    .play-toggle, .settings-toggle {
+      position: relative;
+      width: 30px; height: 30px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.25s ease, background 0.25s ease;
+    }
+    .play-toggle:hover, .settings-toggle:hover {
+      color: rgba(0, 0, 0, 0.75);
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .settings-toggle.active { color: rgba(0, 0, 0, 0.78); }
+    .play-toggle svg, .settings-toggle svg { width: 15px; height: 15px; }
+
+    /* ===== Preset bar (selettore) ===== */
+    .preset-bar-wrapper { position: relative; align-self: center; max-width: 100%; }
+    .preset-bar-wrapper::before,
+    .preset-bar-wrapper::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 28px;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .preset-bar-wrapper::before {
+      left: 0;
+      border-radius: 16px 0 0 16px;
+      background: linear-gradient(to right, rgba(238, 238, 240, 0.95), transparent);
+    }
+    .preset-bar-wrapper::after {
+      right: 0;
+      border-radius: 0 16px 16px 0;
+      background: linear-gradient(to left, rgba(238, 238, 240, 0.95), transparent);
+    }
+    .preset-bar-wrapper.fade-left::before { opacity: 1; }
+    .preset-bar-wrapper.fade-right::after { opacity: 1; }
+
+    /* Track del segmented control: incassato nella card (inset shadow), niente blur proprio. */
+    .preset-bar {
+      position: relative;
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 16px;
+      background: rgba(0, 0, 0, 0.05);
+      border: none;
+      overflow-x: auto;
+      scrollbar-width: none;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    .preset-bar::-webkit-scrollbar { display: none; }
+
+    .preset-pill {
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+      padding: 7px 18px;
+      border: none;
+      border-radius: 13px;
+      background: transparent;
+      color: rgba(0, 0, 0, 0.5);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      text-align: center;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.3s ease;
+    }
+    /* "Fantasma" in semibold (stesso testo) che riserva la larghezza MAX della pill: cosi
+       quando la voce attiva passa a semibold la larghezza non cambia -> niente reflow/resize. */
+    .preset-pill::before {
+      content: attr(data-label);
+      display: block;
+      height: 0;
+      overflow: hidden;
+      visibility: hidden;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    .preset-pill:hover { color: rgba(0, 0, 0, 0.72); }
+    .preset-pill.active { color: rgba(0, 0, 0, 0.9); font-weight: 600; }
+
+    /* Thumb bianco sollevato (come il selettore segmentato iOS/macOS). */
+    .preset-indicator {
+      position: absolute;
+      top: 3px; left: 0;
+      border-radius: 13px;
+      background: #fff;
+      box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.16),
+        0 1px 1px rgba(0, 0, 0, 0.08),
+        inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
+      pointer-events: none;
+      will-change: transform, width;
+    }
+
+    /* ===== Tweakpane: sopra a TUTTO + toggle visibilita ===== */
+    .tp-dfwv { z-index: 2147483647 !important; }
+    .tp-hidden { display: none !important; }
+  </style>
+
+  <!--
+    Import-map: three.js, postprocessing e tweakpane come ES modules da CDN jsdelivr.
+    "postprocessing" importa internamente da "three", quindi "three" e obbligatorio qui.
+    "tweakpane" e il pannello dei controlli live.
+    URL verificati (HTTP 200).
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/",
+      "postprocessing": "https://cdn.jsdelivr.net/npm/postprocessing@6.36.3/build/index.js",
+      "tweakpane": "https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!--
+    Video locale (stesso origin -> nessun problema CORS sulla texture WebGL).
+    autoplay/muted/loop/playsinline per partire senza interazione dove permesso.
+  -->
+  <video id="video"
+         src="assets/sample-badapple.mp4"
+         muted loop playsinline autoplay
+         preload="auto"></video>
+
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
