@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="7" fill="#0f0f12"/>
+  <!-- ✦ sparkle -->
+  <path d="M9 3.5 L10.4 7.6 L14.5 9 L10.4 10.4 L9 14.5 L7.6 10.4 L3.5 9 L7.6 7.6 Z" fill="#e8534e"/>
+  <!-- ○ cerchio vuoto -->
+  <circle cx="23" cy="9" r="4" fill="none" stroke="#5b8cff" stroke-width="1.7"/>
+  <!-- + plus -->
+  <path d="M9 19 V27 M5 23 H13" stroke="#f2b134" stroke-width="1.9" stroke-linecap="round"/>
+  <!-- ● cerchio pieno -->
+  <circle cx="23" cy="23" r="4.2" fill="#9b5bff"/>
+</svg>
