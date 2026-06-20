@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { EffectComposer, RenderPass, EffectPass, BlendFunction } from 'postprocessing';
 import { Pane } from 'tweakpane';
+import { createDriftpane } from 'driftpane';
 import { AsciiEffect, DEFAULT_CHARSET, DEFAULT_EDGE_CHARS } from './AsciiEffect.js';
 import { MemoryGrid } from './MemoryGrid.js';
 import { InkBleedEffect } from './InkBleed.js';
@@ -185,8 +186,10 @@ function togglePlay() {
 let settingsVisible = true;
 function toggleSettings() {
   settingsVisible = !settingsVisible;
-  const root = pane.element || document.querySelector('.tp-dfwv');
-  if (root) root.classList.toggle('tp-hidden', !settingsVisible);
+  // Driftpane sposta il pane dentro un container .driftpane-drag-container (draggabile):
+  // nascondiamo quello, cosi sparisce anche la maniglia di resize.
+  const root = pane.element.closest('.driftpane-drag-container') || pane.element;
+  root.classList.toggle('tp-hidden', !settingsVisible);
   return settingsVisible;
 }
 
@@ -282,37 +285,23 @@ function setBlend(effect, key, opacity) {
 }
 
 // -------------------------------------------------------------------------------------
-// PERSISTENZA (localStorage) + EXPORT/IMPORT JSON + RESET DEFAULT
+// PERSISTENZA / PRESET / DRAG: delegati a DRIFTPANE (vedi createDriftpane piu sotto).
+// Prima erano fatti a mano (localStorage + export/import/reset). Ora il layer Driftpane
+// copre: persistenza dei valori, stato aperto/chiuso delle folder, drag del pannello e
+// preset nominati con export/import JSON e reset.
 // -------------------------------------------------------------------------------------
-const STORE_KEY = 'evoling-ascii-shader/params/v7';
 
-// Valori di default ORIGINARI, catturati prima di caricare lo stato salvato.
+// Default dei parametri (snapshot prima di ogni ripristino): usati come fallback, es. se
+// la sorgente video salvata non esiste piu.
 const DEFAULTS = JSON.parse(JSON.stringify(PARAMS));
 
-const clamp01 = (n, fb) => {
-  const v = typeof n === 'number' && isFinite(n) ? n : fb;
-  return Math.min(1, Math.max(0, v));
-};
-
-// Copia in PARAMS solo le chiavi note e con il tipo corretto (robusto a JSON malformati).
-function assignParams(src) {
-  if (!src || typeof src !== 'object') return;
-  for (const key of Object.keys(DEFAULTS)) {
-    if (!(key in src)) continue;
-    const dv = DEFAULTS[key];
-    const sv = src[key];
-    if (dv && typeof dv === 'object' && 'r' in dv) {
-      if (sv && typeof sv === 'object') {
-        PARAMS[key] = { r: clamp01(sv.r, dv.r), g: clamp01(sv.g, dv.g), b: clamp01(sv.b, dv.b) };
-      }
-    } else if (typeof dv === 'number' && typeof sv === 'number' && isFinite(sv)) {
-      PARAMS[key] = sv;
-    } else if (typeof dv === 'boolean' && typeof sv === 'boolean') {
-      PARAMS[key] = sv;
-    } else if (typeof dv === 'string' && typeof sv === 'string') {
-      PARAMS[key] = sv;
-    }
-  }
+// Istanza Driftpane (creata dopo la costruzione del pannello).
+let dp = null;
+// Instrada i salvataggi dei cambi PROGRAMMATICI (tastiera / bottom bar) verso la
+// persistenza di Driftpane: quei cambi fanno PARAMS + pane.refresh() e non emettono
+// l'evento 'change' che Driftpane intercetta da solo per i cambi via UI del pannello.
+function save() {
+  if (dp) dp.persistence.scheduleSave();
 }
 
 // Applica TUTTI i parametri di PARAMS all'effetto/video. Necessario dopo load/import/reset:
@@ -351,66 +340,9 @@ function applyAll() {
   if (PARAMS.paused) video.pause(); else video.play().catch(() => {});
 }
 
-function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(PARAMS)); } catch (e) { /* storage non disponibile */ }
-}
-function load() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) assignParams(JSON.parse(raw));
-  } catch (e) { /* JSON salvato invalido: ignora */ }
-}
-
-// Esporta i parametri correnti come file JSON scaricabile.
-function exportJson() {
-  const blob = new Blob([JSON.stringify(PARAMS, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'ascii-shader-preset.json';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-// Importa parametri da un file JSON scelto dall'utente.
-function importJson() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'application/json,.json';
-  input.addEventListener('change', () => {
-    const file = input.files && input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        assignParams(JSON.parse(String(reader.result)));
-        pane.refresh();
-        applyAll();
-        save();
-      } catch (e) {
-        console.error('[ASCII] JSON non valido:', e);
-        alert('File JSON non valido.');
-      }
-    };
-    reader.readAsText(file);
-  });
-  input.click();
-}
-
-// Ripristina i valori di default originari (e li rende persistenti).
-function resetDefaults() {
-  assignParams(JSON.parse(JSON.stringify(DEFAULTS)));
-  pane.refresh();
-  applyAll();
-  save();
-}
-
-// Carica lo stato salvato PRIMA di costruire il pannello: cosi le binding nascono gia coi valori persistiti.
-load();
-// Se la sorgente salvata non e piu tra quelle disponibili (es. video rimosso), torna al default.
-if (!VIDEOS.some((v) => v.src === PARAMS.videoSrc)) PARAMS.videoSrc = DEFAULTS.videoSrc;
+// (export/import JSON, reset e persistenza su localStorage sono ora forniti da Driftpane:
+//  il menu Preset ha Esporta/Importa JSON + Resetta posizione, e la persistenza dei valori
+//  e dello stato folder e automatica.)
 
 const pane = new Pane({ title: 'ASCII Shader' });
 
@@ -532,20 +464,25 @@ fVideo.addBinding(PARAMS, 'playbackRate', { label: 'velocita', min: 0.1, max: 3.
 fVideo.addBinding(PARAMS, 'paused', { label: 'in pausa' })
   .on('change', (ev) => { ev.value ? video.pause() : video.play().catch(() => {}); if (overlayApi) overlayApi.setPlaying(ev.value); });
 
-// --- Cartella: Preset / Stato (esporta, importa, reset) ---
-const fPreset = pane.addFolder({ title: 'Preset / Stato' });
-fPreset.addButton({ title: 'Esporta JSON' }).on('click', exportJson);
-fPreset.addButton({ title: 'Importa JSON' }).on('click', importJson);
-fPreset.addButton({ title: 'Reset default' }).on('click', resetDefaults);
+// --- DRIFTPANE: persistenza valori + stato folder, drag del pannello, preset nominati ---
+// Una riga abilita le 4 feature; sostituisce la cartella "Preset / Stato" e tutta la
+// persistenza fatta a mano. Il menu "Preset" (in cima al pannello) offre salva / applica /
+// rinomina / esporta+importa JSON e resetta posizione.
+dp = createDriftpane(pane, {
+  storageNamespace: 'evoling-ascii-shader',
+  draggable: true,
+  presetsEnabled: true,
+  presetFolderTitle: 'Preset',
+  clampToViewport: true,
+});
 
-// PERSISTENZA: salva su localStorage ad ogni modifica del pannello + prima di lasciare la pagina
-// (insurance: garantisce il salvataggio anche se un evento 'change' sfuggisse).
-pane.on('change', () => save());
-window.addEventListener('beforeunload', save);
-window.addEventListener('pagehide', save);
-
-// Applica all'effetto i parametri eventualmente caricati da localStorage e allinea l'UI.
+// Driftpane ha gia ripristinato lo stato salvato (valori + stato folder) via
+// pane.importState(), che NON rilancia gli handler 'change' delle singole binding:
+// riallineiamo l'effetto a PARAMS e l'abilitazione condizionale dei color picker.
+// Se la sorgente video salvata non esiste piu tra quelle disponibili, torniamo al default.
+if (!VIDEOS.some((v) => v.src === PARAMS.videoSrc)) PARAMS.videoSrc = DEFAULTS.videoSrc;
 applyAll();
+updateColorDisabled();
 pane.refresh();
 
 // --- Bottom bar (branding + selettore video + play/pausa), sincronizzata col pannello ---

@@ -250,8 +250,10 @@
       will-change: transform, width;
     }
 
-    /* ===== Tweakpane: sopra a TUTTO + toggle visibilita ===== */
+    /* ===== Tweakpane/Driftpane: sopra a TUTTO + toggle visibilita ===== */
     .tp-dfwv { z-index: 2147483647 !important; }
+    /* Driftpane sposta il pane in un container fixed draggabile: tienilo sopra a tutto. */
+    .driftpane-drag-container { z-index: 2147483647 !important; }
     .tp-hidden { display: none !important; }
   </style>
 
