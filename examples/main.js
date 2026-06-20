@@ -9,9 +9,9 @@ import { EffectComposer, RenderPass, EffectPass, BlendFunction } from 'postproce
 import { Pane } from 'tweakpane';
 import { createDriftpane } from 'driftpane';
 import 'driftpane/theme.css'; // skin "Apple-minimal" frosted di Driftpane
-import { AsciiEffect, DEFAULT_CHARSET, DEFAULT_EDGE_CHARS } from './AsciiEffect.js';
-import { MemoryGrid } from './MemoryGrid.js';
-import { InkBleedEffect } from './InkBleed.js';
+// La demo importa il toolkit dal suo entry point (lo stesso import che userebbe un consumer del
+// pacchetto: `from 'evoling-aschii-shader'`). Qui puntiamo alla sorgente per il dev senza build.
+import { AsciiEffect, DEFAULT_CHARSET, DEFAULT_EDGE_CHARS, MemoryGrid, InkBleedEffect } from '../src/index.js';
 import { createOverlay } from './overlay.js';
 
 // Sorgenti video (fonte unica: alimenta sia la bottom bar sia il picker Tweakpane).

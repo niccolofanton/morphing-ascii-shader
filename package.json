@@ -1,21 +1,69 @@
 {
-  "name": "evoling-aschii-shader",
-  "private": true,
+  "name": "@niccolofanton/morphing-ascii-shader",
   "version": "1.0.0",
+  "description": "Real-time ASCII / halftone post-processing effect for three.js + pmndrs/postprocessing: glyph-atlas luminance mapping, Sobel edge glyphs, per-cell temporal memory and SDF shape morphing.",
   "type": "module",
-  "description": "Real-time ASCII/halftone video shader \u2014 three.js + pmndrs/postprocessing",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+  "license": "MIT",
+  "author": "Niccolò Fanton",
+  "homepage": "https://github.com/niccolofanton/morphing-ascii-shader#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niccolofanton/morphing-ascii-shader.git"
   },
-  "dependencies": {
+  "bugs": {
+    "url": "https://github.com/niccolofanton/morphing-ascii-shader/issues"
+  },
+  "keywords": [
+    "three",
+    "threejs",
+    "postprocessing",
+    "pmndrs",
+    "ascii",
+    "halftone",
+    "shader",
+    "glsl",
+    "webgl",
+    "effect",
+    "sdf",
+    "creative-coding"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "types",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "vite --config vite.config.demo.js",
+    "build": "vite build",
+    "build:demo": "vite build --config vite.config.demo.js",
+    "preview": "vite preview --config vite.config.demo.js",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "postprocessing": ">=6.36.0",
+    "three": ">=0.161.0"
+  },
+  "devDependencies": {
     "driftpane": "^1.0.2",
     "postprocessing": "6.36.3",
     "three": "0.161.0",
-    "tweakpane": "4.0.5"
-  },
-  "devDependencies": {
+    "tweakpane": "4.0.5",
     "vite": "^8.0.16"
   }
 }
