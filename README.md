@@ -82,8 +82,24 @@ With `sdfMorph: true` the current glyph **transforms into the shape of the targe
 
 TypeScript definitions are bundled (`types/index.d.ts`).
 
-📖 **Full parameter reference**, with an animated GIF for every parameter:
-[`docs/PARAMETERS.md`](docs/PARAMETERS.md).
+## Parameters
+
+Every parameter is documented in depth — type, default, range, what it does, its visual effect
+and interactions — **each with an animated GIF** showing exactly what it changes.
+
+### 📖 → [Full parameter reference with GIFs: `docs/PARAMETERS.md`](docs/PARAMETERS.md)
+
+Covers all of `AsciiEffect`, `InkBleedEffect` and `MemoryGrid`:
+
+| Group | Parameters |
+|---|---|
+| **Grid & glyphs** | `cellSize`, `glyphScale`, `charset`, `variety`, `invert` |
+| **Color** | `colorMode`, `ink`, `background`, `whiteCutoff` |
+| **Luminance** | `brightness`, `contrast`, `gamma` |
+| **Edges** | `edges`, `edgeThreshold`, `edgeChars` |
+| **Memory & morph** | `useMemory`, `glyphBlend`, `magnet`, `sdfMorph`, `sdfThreshold`, `sdfAA`, `rate` |
+| **Grain** | `colorVar`, `noise`, `noiseScale`, `noiseMode` |
+| **Ink bleed** | `bleed`, `radius`, `blur` |
 
 ## Features
 
