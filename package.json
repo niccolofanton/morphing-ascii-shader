@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "driftpane": "^1.0.1",
+    "driftpane": "^1.0.2",
     "postprocessing": "6.36.3",
     "three": "0.161.0",
     "tweakpane": "4.0.5"
