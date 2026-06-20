@@ -60,7 +60,7 @@
     "three": ">=0.161.0"
   },
   "devDependencies": {
-    "driftpane": "^1.0.2",
+    "driftpane": "^1.0.0",
     "postprocessing": "6.36.3",
     "three": "0.161.0",
     "tweakpane": "4.0.5",
