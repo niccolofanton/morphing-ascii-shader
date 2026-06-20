@@ -16,7 +16,7 @@ frosted-glass UI.
 
 <p align="center"><sub>Real canvas capture (effect applied to “Bad Apple!!”).</sub></p>
 
-<p align="center"><strong>▶ Live demo: <a href="https://m-ascii.pages.dev">m-ascii.pages.dev</a></strong></p>
+<p align="center"><strong>▶ Live demo: <a href="https://m-ascii.niccolofanton.dev">m-ascii.niccolofanton.dev</a></strong></p>
 
 ## Install
 
