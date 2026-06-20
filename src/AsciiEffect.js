@@ -56,6 +56,126 @@ function buildGlyphAtlas(charset, glyphSize = 96) {
   return { texture, count };
 }
 
+// --- Distance transform 1D (Felzenszwalb-Huttenlocher, O(n)) ---
+// Per ogni indice q calcola min_p( f[p] + (q-p)^2 ): la distanza euclidea AL QUADRATO al
+// "seed" (costo 0) piu vicino lungo una riga/colonna. Applicata su righe e colonne -> EDT 2D.
+function _edt1d(f, d, v, z, n) {
+  let k = 0;
+  v[0] = 0;
+  z[0] = -1e20;
+  z[1] = 1e20;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) {
+      k--;
+      s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    }
+    k++;
+    v[k] = q;
+    z[k] = s;
+    z[k + 1] = 1e20;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1] < q) k++;
+    const dx = q - v[k];
+    d[q] = dx * dx + f[v[k]];
+  }
+}
+
+// EDT 2D in-place su 'grid' (W x H di costi): prima colonne, poi righe. A fine 'grid' contiene
+// la distanza euclidea AL QUADRATO verso la cella-seed (costo 0) piu vicina.
+function _edt2d(grid, W, H) {
+  const maxd = Math.max(W, H);
+  const d = new Float64Array(maxd);
+  const v = new Int32Array(maxd);
+  const z = new Float64Array(maxd + 1);
+  const buf = new Float64Array(maxd);
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) buf[y] = grid[y * W + x];
+    _edt1d(buf, d, v, z, H);
+    for (let y = 0; y < H; y++) grid[y * W + x] = d[y];
+  }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) buf[x] = grid[y * W + x];
+    _edt1d(buf, d, v, z, W);
+    for (let x = 0; x < W; x++) grid[y * W + x] = d[x];
+  }
+}
+
+// Costruisce un atlante SDF (signed distance field) dei glifi, con la STESSA geometria e
+// orientamento dell'atlante alpha (Texture da canvas -> stesso flipY). Nel canale: 0.5 = bordo,
+// >0.5 dentro, <0.5 fuori, su un range di +/- 'spread' px. Serve al MORPH DI FORMA: interpolando
+// la distanza tra due glifi e sogliando, la forma di uno si trasforma progressivamente nell'altro.
+// Generazione una tantum (init / cambio charset) via EDT separabile -> pochi ms.
+function buildSdfAtlas(charset, glyphSize = 96, spread = 12) {
+  const count = Math.max(1, charset.length);
+  const canvas = document.createElement('canvas');
+  canvas.width = glyphSize * count;
+  canvas.height = glyphSize;
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${Math.floor(glyphSize * 0.58)}px "Helvetica Neue", Arial, "Apple Symbols", sans-serif`;
+  for (let i = 0; i < count; i++) {
+    ctx.fillText(charset[i], i * glyphSize + glyphSize / 2, glyphSize / 2);
+  }
+
+  const W = glyphSize, H = glyphSize;
+  const src = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const out = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+
+  const mask = new Uint8Array(W * H);
+  const inside = new Float64Array(W * H);
+  const outside = new Float64Array(W * H);
+  const INF = 1e20;
+
+  for (let g = 0; g < count; g++) {
+    let anyIn = false, anyOut = false;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const a = src.data[(y * src.width + (g * W + x)) * 4 + 3]; // alpha del glifo (0..255)
+        const isIn = a > 127;
+        const p = y * W + x;
+        mask[p] = isIn ? 1 : 0;
+        if (isIn) { inside[p] = 0; outside[p] = INF; anyIn = true; }
+        else { inside[p] = INF; outside[p] = 0; anyOut = true; }
+      }
+    }
+    // inside[]  -> dist^2 al pixel INSIDE piu vicino  (valida per i pixel FUORI)
+    // outside[] -> dist^2 al pixel OUTSIDE piu vicino (valida per i pixel DENTRO)
+    _edt2d(inside, W, H);
+    _edt2d(outside, W, H);
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const p = y * W + x;
+        let signed;
+        if (!anyIn) signed = -spread;        // glifo vuoto (es. lo spazio): tutto "fuori"
+        else if (!anyOut) signed = spread;   // glifo pieno
+        else signed = mask[p] ? Math.sqrt(outside[p]) : -Math.sqrt(inside[p]);
+        let v01 = 0.5 + (signed / spread) * 0.5;   // 0.5 = bordo, >0.5 dentro
+        v01 = v01 < 0 ? 0 : v01 > 1 ? 1 : v01;
+        const oi = (y * canvas.width + (g * W + x)) * 4;
+        const byte = Math.round(v01 * 255);
+        out[oi] = byte; out[oi + 1] = byte; out[oi + 2] = byte; out[oi + 3] = 255;
+      }
+    }
+  }
+
+  ctx.putImageData(new ImageData(out, canvas.width, canvas.height), 0, 0);
+  const texture = new Texture(canvas);
+  texture.format = RGBAFormat;
+  texture.magFilter = LinearFilter; // filtro lineare SULLA DISTANZA = bordo liscio sub-texel
+  texture.minFilter = LinearFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return { texture, count };
+}
+
 // Fragment shader (convenzione postprocessing: mainImage(inputColor, uv, outputColor)).
 // "inputBuffer" e "resolution" sono forniti dall'EffectPass.
 const FRAGMENT = /* glsl */ `
@@ -85,6 +205,15 @@ uniform vec2  uGridSize;        // numero celle (colonne, righe) della texture m
 uniform float uGlyphScale;      // scala del glifo dentro la cella (0.1..1.0)
 uniform bool  uGlyphBlend;      // cross-fade tra glifi adiacenti invece di scatto
 uniform float uMagnet;          // 0..1: magnetismo del cross-fade (alto = aggancio piu deciso/precoce)
+
+// --- Morph di FORMA (SDF) ---
+// I glifi sono anche un atlante SDF (signed distance field). Interpolando la DISTANZA tra glifo
+// A e B e poi sogliando, la forma di A si TRASFORMA progressivamente in quella di B passando per
+// forme intermedie connesse (come un morph tra volti). I caratteri del charset = "keyframe".
+uniform sampler2D uGlyphSdf;        // atlante SDF dei glifi di densita (0.5 = bordo, >0.5 dentro)
+uniform bool  uSdfMorph;            // usa il morph di forma (SDF) al posto del cross-fade alpha
+uniform float uSdfAA;               // ampiezza dell'antialias della soglia (0 = netto, alto = morbido)
+uniform float uSdfThreshold;        // soglia (0.5 = neutra; <0.5 ingrassa, >0.5 assottiglia i tratti)
 
 // --- Texture / grana ---
 uniform float uColorVar;        // mottlatura per-carattere: spot leggermente piu chiari/scuri (soft)
@@ -132,6 +261,15 @@ float sampleGlyph(float idx, vec2 p) {
   idx = clamp(idx, 0.0, uGlyphCount - 1.0);
   vec2 atlasUv = vec2((idx + p.x) / uGlyphCount, p.y);
   return texture2D(uGlyphAtlas, atlasUv).a;
+}
+
+// Campiona la DISTANZA CON SEGNO (0.5 = bordo, >0.5 dentro) del glifo 'idx' alla coord locale
+// 'p'. Fuori cella -> 0 (ben "fuori"), cosi l'interpolazione non aggancia il bordo dal vuoto.
+float sampleSdf(float idx, vec2 p) {
+  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 0.0;
+  idx = clamp(idx, 0.0, uGlyphCount - 1.0);
+  vec2 atlasUv = vec2((idx + p.x) / uGlyphCount, p.y);
+  return texture2D(uGlyphSdf, atlasUv).r;
 }
 
 // Fonde un layer di grana grigia 'n' (0..1) sul colore 'base' con una BLEND MODE (stile Photoshop).
@@ -264,7 +402,19 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
       // aggancio MORBIDO (anti-flicker): vicino alla soglia 0.5 sfuma invece di scattare di colpo.
       float snapped = smoothstep(0.5 - 0.12, 0.5 + 0.12, f);
       float fAdj = mix(f, snapped, snap);
-      mask = mix(sampleGlyph(i, pScaled), sampleGlyph(i + 1.0, pScaled), fAdj);
+      if (uSdfMorph) {
+        // MORPH DI FORMA (SDF): interpolo la DISTANZA con segno dei due glifi e soglio. La forma
+        // di A si TRASFORMA progressivamente in quella di B passando per forme intermedie (come
+        // un morph di volti). I caratteri sono i "keyframe"; fAdj e' il parametro di morph (0=A,
+        // 1=B), gia agganciato a un glifo netto a cella ferma dal sistema magnetico.
+        float dA = sampleSdf(i,       pScaled);
+        float dB = sampleSdf(i + 1.0, pScaled);
+        float d = mix(dA, dB, fAdj);                  // distanza interpolata = forma intermedia
+        float aa = max(uSdfAA, 0.001);
+        mask = smoothstep(uSdfThreshold - aa, uSdfThreshold + aa, d);
+      } else {
+        mask = mix(sampleGlyph(i, pScaled), sampleGlyph(i + 1.0, pScaled), fAdj);
+      }
     } else {
       // Comportamento a scatti (default).
       float glyph = clamp(floor(base + 0.5), 0.0, uGlyphCount - 1.0);
@@ -324,6 +474,9 @@ export class AsciiEffect extends Effect {
    * @param {number}  [options.glyphScale]     scala del glifo dentro la cella (0.1..1.0)
    * @param {boolean} [options.glyphBlend]     cross-fade tra glifi adiacenti
    * @param {number}  [options.magnet]         magnetismo del cross-fade (0..1, alto = aggancio deciso)
+   * @param {boolean} [options.sdfMorph]       morph di FORMA via SDF (il glifo si trasforma in target)
+   * @param {number}  [options.sdfAA]          antialias della soglia SDF (0 netto .. alto morbido)
+   * @param {number}  [options.sdfThreshold]   soglia SDF (0.5 neutra; <0.5 ingrassa, >0.5 assottiglia)
    */
   constructor({
     charset = DEFAULT_CHARSET,
@@ -344,6 +497,9 @@ export class AsciiEffect extends Effect {
     glyphScale = 1.0,
     glyphBlend = false,
     magnet = 0.6,
+    sdfMorph = false,
+    sdfAA = 0.04,
+    sdfThreshold = 0.5,
     colorVar = 0.10,
     noise = 0.06,
     noiseScale = 1.0,
@@ -351,6 +507,7 @@ export class AsciiEffect extends Effect {
   } = {}) {
     const glyph = buildGlyphAtlas(charset, 96);
     const edge = buildGlyphAtlas(edgeChars, 96);
+    const sdf = buildSdfAtlas(charset, 96); // atlante SDF (morph di forma); stesso ordine glifi
 
     super('AsciiEffect', FRAGMENT, {
       uniforms: new Map([
@@ -378,6 +535,11 @@ export class AsciiEffect extends Effect {
         ['uGlyphScale', new Uniform(glyphScale)],
         ['uGlyphBlend', new Uniform(glyphBlend)],
         ['uMagnet', new Uniform(magnet)],
+        // Morph di forma (SDF).
+        ['uGlyphSdf', new Uniform(sdf.texture)],
+        ['uSdfMorph', new Uniform(sdfMorph)],
+        ['uSdfAA', new Uniform(sdfAA)],
+        ['uSdfThreshold', new Uniform(sdfThreshold)],
         // Texture / grana.
         ['uColorVar', new Uniform(colorVar)],
         ['uNoise', new Uniform(noise)],
@@ -390,6 +552,7 @@ export class AsciiEffect extends Effect {
     this._edgeChars = edgeChars;
     this._glyphTexture = glyph.texture;
     this._edgeTexture = edge.texture;
+    this._sdfTexture = sdf.texture;
   }
 
   // --- Ricostruzione atlanti quando cambiano i set di caratteri ---
@@ -401,6 +564,11 @@ export class AsciiEffect extends Effect {
     this._glyphTexture = glyph.texture;
     this.uniforms.get('uGlyphAtlas').value = glyph.texture;
     this.uniforms.get('uGlyphCount').value = glyph.count;
+    // Rigenera anche l'atlante SDF (morph di forma) sullo stesso charset.
+    if (this._sdfTexture) this._sdfTexture.dispose();
+    const sdf = buildSdfAtlas(this._charset, 96);
+    this._sdfTexture = sdf.texture;
+    this.uniforms.get('uGlyphSdf').value = sdf.texture;
   }
 
   get edgeChars() { return this._edgeChars; }
@@ -486,6 +654,17 @@ export class AsciiEffect extends Effect {
   get magnet() { return this.uniforms.get('uMagnet').value; }
   set magnet(v) { this.uniforms.get('uMagnet').value = v; }
 
+  // --- Morph di forma (SDF) ---
+  // Quando attivo, il glifo si TRASFORMA progressivamente nella forma del target via SDF.
+  get sdfMorph() { return this.uniforms.get('uSdfMorph').value; }
+  set sdfMorph(v) { this.uniforms.get('uSdfMorph').value = v; }
+
+  get sdfAA() { return this.uniforms.get('uSdfAA').value; }
+  set sdfAA(v) { this.uniforms.get('uSdfAA').value = v; }
+
+  get sdfThreshold() { return this.uniforms.get('uSdfThreshold').value; }
+  set sdfThreshold(v) { this.uniforms.get('uSdfThreshold').value = v; }
+
   // Colori esposti come Vector3 (componenti 0..1) per il color picker di Tweakpane.
   get ink() { return this.uniforms.get('uInk').value; }
   get background() { return this.uniforms.get('uBackground').value; }
@@ -493,6 +672,7 @@ export class AsciiEffect extends Effect {
   dispose() {
     if (this._glyphTexture) this._glyphTexture.dispose();
     if (this._edgeTexture) this._edgeTexture.dispose();
+    if (this._sdfTexture) this._sdfTexture.dispose();
     super.dispose();
   }
 }

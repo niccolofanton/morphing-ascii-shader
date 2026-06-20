@@ -229,6 +229,10 @@ const PARAMS = {
   glyphBlend: ascii.glyphBlend,     // cross-fade glifi
   magnet: 0.85,                     // magnetismo del cross-fade (0..1)
   glyphScale: 1.92,                 // dimensione carattere dentro la cella
+  // Morph di forma (SDF) — sottomenu dedicato. Default OFF: comportamento identico a oggi.
+  sdfMorph: ascii.sdfMorph,             // attiva il morph di FORMA (il glifo si trasforma nel target)
+  sdfThreshold: ascii.sdfThreshold,     // spessore tratti (0.5 neutra)
+  sdfAA: ascii.sdfAA,                   // morbidezza del bordo
   // Grana (cartella propria).
   noise: 0.155,                     // opacita del layer di grana
   noiseScale: 5,                    // dimensione della grana (px)
@@ -332,6 +336,10 @@ function applyAll() {
   ascii.glyphBlend = PARAMS.glyphBlend;
   ascii.magnet = PARAMS.magnet;
   ascii.glyphScale = PARAMS.glyphScale;
+  // Morph di forma (SDF).
+  ascii.sdfMorph = PARAMS.sdfMorph;
+  ascii.sdfThreshold = PARAMS.sdfThreshold;
+  ascii.sdfAA = PARAMS.sdfAA;
   ascii.noise = PARAMS.noise;
   ascii.noiseScale = PARAMS.noiseScale;
   ascii.noiseMode = PARAMS.noiseMode;
@@ -406,6 +414,24 @@ fMem.addBinding(PARAMS, 'magnet', { label: 'magnetismo (0=off)', min: 0.0, max: 
   .on('change', (ev) => { ascii.magnet = ev.value; });
 fMem.addButton({ title: 'reset memoria' }).on('click', () => memoryGrid.reset());
 
+// --- Cartella: Morph di forma (sperimentale) ---
+// Il glifo si TRASFORMA progressivamente nella forma del target (morph di forma vero, come tra
+// due volti) interpolando i distance field (SDF) dei glifi. I caratteri = keyframe. NON
+// distruttivo: con "attivo" OFF il risultato e identico a prima. Richiede "cross-fade glifo"
+// (Memoria/Trail) attivo per avere una transizione; i controlli sono disabilitati a OFF.
+const fMorph = pane.addFolder({ title: 'Morph di forma', expanded: false });
+const morphCtrls = [];
+const updateMorphDisabled = () => { morphCtrls.forEach((c) => { c.disabled = !PARAMS.sdfMorph; }); };
+fMorph.addBinding(PARAMS, 'sdfMorph', { label: 'attivo' })
+  .on('change', (ev) => { ascii.sdfMorph = ev.value; updateMorphDisabled(); });
+morphCtrls.push(
+  fMorph.addBinding(PARAMS, 'sdfThreshold', { label: 'spessore tratti', min: 0.2, max: 0.8, step: 0.01 })
+    .on('change', (ev) => { ascii.sdfThreshold = ev.value; }),
+  fMorph.addBinding(PARAMS, 'sdfAA', { label: 'morbidezza bordo', min: 0.0, max: 0.3, step: 0.005 })
+    .on('change', (ev) => { ascii.sdfAA = ev.value; }),
+);
+updateMorphDisabled();
+
 // --- Cartella: Luminanza ---
 const fLum = pane.addFolder({ title: 'Luminanza' });
 fLum.addBinding(PARAMS, 'brightness', { min: -0.5, max: 0.5, step: 0.01 })
@@ -475,6 +501,11 @@ dp = createDriftpane(pane, {
   presetsEnabled: true,
   presetFolderTitle: 'Preset',
   clampToViewport: true,
+  // Mostra TUTTI i controlli opzionali del menu preset (di default nascosti):
+  // selettore tema, "Resetta posizione" ed "Elimina preset".
+  showThemeControl: true,
+  showResetPosition: true,
+  showDeletePreset: true,
 });
 
 // Driftpane ha gia ripristinato lo stato salvato (valori + stato folder) via
