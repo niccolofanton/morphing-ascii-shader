@@ -82,6 +82,9 @@ With `sdfMorph: true` the current glyph **transforms into the shape of the targe
 
 TypeScript definitions are bundled (`types/index.d.ts`).
 
+📖 **Full parameter reference**, with an animated GIF for every parameter:
+[`docs/PARAMETERS.md`](docs/PARAMETERS.md).
+
 ## Features
 
 - **Glyph-atlas ASCII** — per-cell luminance picks a glyph from a runtime atlas, with per-cell

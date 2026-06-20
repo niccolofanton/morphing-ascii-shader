@@ -539,3 +539,4 @@ window.addEventListener('keydown', (e) => {
 window.__ascii = ascii;
 window.__pane = pane;
 window.__memory = memoryGrid;
+window.__inkBleed = inkBleed;
