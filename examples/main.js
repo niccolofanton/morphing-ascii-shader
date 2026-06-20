@@ -7,8 +7,8 @@
 import * as THREE from 'three';
 import { EffectComposer, RenderPass, EffectPass, BlendFunction } from 'postprocessing';
 import { Pane } from 'tweakpane';
-import { createDriftpane } from 'driftpane';
-import 'driftpane/theme.css'; // skin "Apple-minimal" frosted di Driftpane
+import { createDriftpane } from '@niccolofanton/driftpane';
+import '@niccolofanton/driftpane/theme.css'; // skin "Apple-minimal" frosted di Driftpane
 // La demo importa il toolkit dal suo entry point (lo stesso import che userebbe un consumer del
 // pacchetto: `from 'evoling-aschii-shader'`). Qui puntiamo alla sorgente per il dev senza build.
 import { AsciiEffect, DEFAULT_CHARSET, DEFAULT_EDGE_CHARS, MemoryGrid, InkBleedEffect } from '../src/index.js';

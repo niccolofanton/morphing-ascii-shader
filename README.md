@@ -124,7 +124,7 @@ npm run dev        # Vite dev server serving examples/ (default http://localhost
 
 Build the demo as a static site: `npm run build:demo` (outputs `demo-dist/`).
 
-> The demo's panel uses [`driftpane`](https://www.npmjs.com/package/driftpane) for persistence,
+> The demo's panel uses [`@niccolofanton/driftpane`](https://www.npmjs.com/package/@niccolofanton/driftpane) for persistence,
 > drag and presets. If a clone fails to install it, it only affects the demo, not the library.
 
 ## Build the library
@@ -174,7 +174,7 @@ tools/                  # procedural video generators (numpy + ffmpeg)
 
 [three.js](https://threejs.org/) `0.161` · [postprocessing](https://github.com/pmndrs/postprocessing)
 `6.36.3` (peer) · demo UI via [Tweakpane](https://tweakpane.github.io/docs/) `4.0.5` +
-[`driftpane`](https://www.npmjs.com/package/driftpane) — bundled by [Vite](https://vitejs.dev/).
+[`@niccolofanton/driftpane`](https://www.npmjs.com/package/@niccolofanton/driftpane) — bundled by [Vite](https://vitejs.dev/).
 
 ## Assets
 
