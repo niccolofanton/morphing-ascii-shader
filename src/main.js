@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { EffectComposer, RenderPass, EffectPass, BlendFunction } from 'postprocessing';
 import { Pane } from 'tweakpane';
 import { createDriftpane } from 'driftpane';
+import 'driftpane/theme.css'; // skin "Apple-minimal" frosted di Driftpane
 import { AsciiEffect, DEFAULT_CHARSET, DEFAULT_EDGE_CHARS } from './AsciiEffect.js';
 import { MemoryGrid } from './MemoryGrid.js';
 import { InkBleedEffect } from './InkBleed.js';

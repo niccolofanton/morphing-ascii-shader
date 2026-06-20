@@ -3,14 +3,14 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Real-time ASCII/halftone video shader — three.js + pmndrs/postprocessing",
+  "description": "Real-time ASCII/halftone video shader \u2014 three.js + pmndrs/postprocessing",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "driftpane": "^1.0.0",
+    "driftpane": "^1.0.1",
     "postprocessing": "6.36.3",
     "three": "0.161.0",
     "tweakpane": "4.0.5"
