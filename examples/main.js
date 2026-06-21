@@ -44,9 +44,9 @@ const VIDEO_PRESETS = {
     variety: 6,
     asciiBlend: 'NORMAL',
     asciiBlendOpacity: 1,
-    bleedAmount: 0.95,
-    bleedRadius: 16,
-    bleedBlur: 0.31,
+    bleedAmount: 2,
+    bleedRadius: 29,
+    bleedBlur: 1,
     bleedBlend: 'MULTIPLY',
     bleedBlendOpacity: 1,
     memoryOn: true,
@@ -81,9 +81,9 @@ const VIDEO_PRESETS = {
     variety: 0.4,
     asciiBlend: 'NORMAL',
     asciiBlendOpacity: 1,
-    bleedAmount: 1.73,
-    bleedRadius: 16,
-    bleedBlur: 0.31,
+    bleedAmount: 2,
+    bleedRadius: 29,
+    bleedBlur: 1,
     bleedBlend: 'MULTIPLY',
     bleedBlendOpacity: 1,
     memoryOn: true,
@@ -119,8 +119,8 @@ const VIDEO_PRESETS = {
     asciiBlend: 'NORMAL',
     asciiBlendOpacity: 1,
     bleedAmount: 2,
-    bleedRadius: 16,
-    bleedBlur: 0.31,
+    bleedRadius: 29,
+    bleedBlur: 1,
     bleedBlend: 'MULTIPLY',
     bleedBlendOpacity: 1,
     memoryOn: true,
@@ -226,7 +226,7 @@ const _bufSize = new THREE.Vector2();
 function syncMemorySize() {
   renderer.getDrawingBufferSize(_bufSize);
   memoryGrid.setSize(_bufSize.x, _bufSize.y, ascii.cellSize);
-  ascii.gridSize = memoryGrid.gridSize;
+  ascii.setGridSize(memoryGrid.gridW, memoryGrid.gridH); // no-alloc (prima: new Vector2 per frame)
 }
 
 // La cella e in pixel del DRAWING BUFFER, quindi la dimensione apparente in CSS px e
@@ -240,11 +240,32 @@ function applyCellSize() {
 const inkBleed = new InkBleedEffect({ bleed: 0.5, radius: 24 });
 
 // --- Pipeline postprocessing ---
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
+// depthBuffer:false -> i due RT ping-pong NON allocano un depth renderbuffer: la scena e' un solo
+// quad opaco (camera Ortho) e nessun pass legge la profondita' -> bit-identico, libera VRAM/banda.
+// (Da ripristinare se in futuro si aggiunge un effetto che usa il depth, es. DoF/SSAO/Outline.)
+const composer = new EffectComposer(renderer, { depthBuffer: false });
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
 composer.addPass(new EffectPass(camera, ascii));
 composer.addPass(new EffectPass(camera, inkBleed)); // ink bleed come pass separato dopo l'ASCII
 composer.setSize(window.innerWidth, window.innerHeight);
+
+// GATE del RenderPass: quando il suo output NON puo' raggiungere l'immagine finale, saltarlo e'
+// bit-identico (misurato: l'output ASCII e' byte-identico con scena reale o input qualsiasi).
+// Redundant sse: blend ASCII = NORMAL e opacity = 1 (il wrapper dell'EffectPass scarta del tutto
+// l'inputColor) AND memoria ON (l'ASCII campiona la memoria, non l'inputBuffer) AND edges OFF (il
+// Sobel campionerebbe l'inputBuffer). Legge lo stato LIVE dell'effetto (non PARAMS) e va richiamato
+// da OGNI punto che muta uno di questi quattro stati (vedi sotto). RenderPass.needsSwap=false, quindi
+// disabilitarlo salta solo il render della scena senza alterare la topologia dei buffer.
+function updateRenderPassGate() {
+  const bm = ascii.blendMode;
+  const redundant =
+    bm.blendFunction === BlendFunction.NORMAL &&
+    bm.opacity.value >= 1 &&
+    ascii.useMemory === true &&
+    ascii.edges === false;
+  renderPass.enabled = !redundant;
+}
 
 // --- Aspect-fit del video (modalita PER-VIDEO, vedi VIDEOS[].fit) ---
 // Il quad e a tutto schermo: senza correzione il video viene STRETCHATO alle proporzioni dello
@@ -314,6 +335,7 @@ window.addEventListener('resize', onResize);
 const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
+  if (window.__benchHold) return; // bench: congela il loop durante la misura (no-op in uso normale)
   if (video.readyState >= video.HAVE_CURRENT_DATA) {
     videoTexture.needsUpdate = true;
   }
@@ -569,6 +591,7 @@ function applyAll() {
   setVideoSource(PARAMS.videoSrc);
   video.playbackRate = PARAMS.playbackRate;
   if (PARAMS.paused) video.pause(); else video.play().catch(() => {});
+  updateRenderPassGate(); // ri-valuta se il RenderPass e' ridondante col nuovo stato
 }
 
 // (export/import JSON, reset e persistenza su localStorage sono ora forniti da Driftpane:
@@ -627,7 +650,7 @@ fBleed.addBinding(PARAMS, 'bleedBlendOpacity', { label: 'opacity', min: 0.0, max
 // --- Cartella: Memoria / Trail ---
 const fMem = pane.addFolder({ title: 'Memory / Trail' });
 fMem.addBinding(PARAMS, 'memoryOn', { label: 'memory' })
-  .on('change', (ev) => { ascii.useMemory = ev.value; });
+  .on('change', (ev) => { ascii.useMemory = ev.value; updateRenderPassGate(); });
 fMem.addBinding(PARAMS, 'morphRate', { label: 'change speed (low=slow/trail, high=fast)', min: 0.075, max: 60, step: 0.05 })
   .on('change', (ev) => { memoryGrid.rate = ev.value; });
 fMem.addBinding(PARAMS, 'glyphBlend', { label: 'glyph cross-fade' })
@@ -682,9 +705,9 @@ fColor.addBinding(PARAMS, 'colorMode', {
 }).on('change', (ev) => { ascii.colorMode = ev.value; updateColorDisabled(); });
 // Fusione del layer ASCII col video sottostante (compositing del layer principale).
 fColor.addBinding(PARAMS, 'asciiBlend', { label: 'ASCII ↔ video', options: BLEND_OPTIONS })
-  .on('change', (ev) => { setBlend(ascii, ev.value, PARAMS.asciiBlendOpacity); });
+  .on('change', (ev) => { setBlend(ascii, ev.value, PARAMS.asciiBlendOpacity); updateRenderPassGate(); });
 fColor.addBinding(PARAMS, 'asciiBlendOpacity', { label: 'ASCII opacity', min: 0.0, max: 1.0, step: 0.01 })
-  .on('change', (ev) => { ascii.blendMode.opacity.value = ev.value; });
+  .on('change', (ev) => { ascii.blendMode.opacity.value = ev.value; updateRenderPassGate(); });
 const inkBinding = fColor.addBinding(PARAMS, 'ink', { label: 'ink', color: { type: 'float' } })
   .on('change', (ev) => { syncColor(ascii.ink, ev.value); });
 const bgBinding = fColor.addBinding(PARAMS, 'background', { label: 'background', color: { type: 'float' } })
@@ -696,7 +719,7 @@ updateColorDisabled();
 // --- Cartella: Contorni (Sobel) ---
 const fEdge = pane.addFolder({ title: 'Edges (Sobel)' });
 fEdge.addBinding(PARAMS, 'edges', { label: 'enabled' })
-  .on('change', (ev) => { ascii.edges = ev.value; });
+  .on('change', (ev) => { ascii.edges = ev.value; updateRenderPassGate(); });
 fEdge.addBinding(PARAMS, 'edgeThreshold', { label: 'threshold', min: 0.0, max: 2.0, step: 0.01 })
   .on('change', (ev) => { ascii.edgeThreshold = ev.value; });
 fEdge.addBinding(PARAMS, 'edgeChars', { label: 'glyphs (- | / \\)' })
@@ -768,3 +791,25 @@ window.__ascii = ascii;
 window.__pane = pane;
 window.__memory = memoryGrid;
 window.__inkBleed = inkBleed;
+window.__composer = composer;
+window.__renderer = renderer;
+window.__scene = scene;
+window.__camera = camera;
+window.__quad = quad;
+window.__video = video;
+
+// BENCH GPU per-pass / per-step: attivo SOLO con ?bench (vedi examples/bench.js). Non altera la
+// resa (congela il loop, misura, ripristina, riprende). Risultato in window.__benchResult.
+if (new URLSearchParams(location.search).has('bench')) {
+  window.__benchHold = false;
+  const start = () => import('./bench.js')
+    .then((m) => m.runBenchmark({
+      renderer, composer, scene, camera, memoryGrid, ascii, inkBleed, video,
+      hold: (v) => { window.__benchHold = v; },
+    }))
+    .then((r) => { window.__benchResult = r; window.__benchDone = true; })
+    .catch((e) => { window.__benchError = String(e); window.__benchDone = true; console.error(e); });
+  // Attende un frame decodificato + breve warmup (video in play, memoria popolata) per misurare a regime.
+  const waitReady = () => { (video.readyState >= 2) ? setTimeout(start, 1500) : setTimeout(waitReady, 200); };
+  waitReady();
+}

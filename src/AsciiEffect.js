@@ -428,7 +428,10 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
   // MOTTLATURA per-carattere: spot piu chiari/scuri DENTRO il glifo (texture organica).
   // Frequenza FISSA in screen-space (~macchie morbide, indipendenti dalla cella) e gain *2
   // perche fosse percepibile: a default ~+/-20% sul colore del glifo, a max molto marcata.
-  float mott = 1.0 + (vnoise(fragPx * 0.08) - 0.5) * 2.0 * uColorVar;
+  // Guard bit-identico: a uColorVar==0 la mottlatura e' un no-op (mott=1.0), ma vnoise (4x hash +
+  // bilineare) veniva comunque calcolata per ogni pixel. Saltandola il risultato e' identico.
+  float mott = 1.0;
+  if (uColorVar != 0.0) mott = 1.0 + (vnoise(fragPx * 0.08) - 0.5) * 2.0 * uColorVar;
   vec3 ink = cellColor * mott;     // colore del carattere, mottlato
 
   if (uColorMode == 0) {
@@ -448,9 +451,16 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
   // GRANA (film grain) STATICA SOPRA TUTTO, fusa col colore tramite una BLEND MODE.
   // uNoiseScale quantizza la coordinata pixel -> grana piu grossa (blocchi) con valori alti.
   // uNoise = OPACITA del layer; uNoiseMode = modalita di fusione (additivo, multiply, overlay, burn...).
-  float g = hash21(floor(fragPx / max(uNoiseScale, 1.0))); // grana STATICA (dipende solo dal pixel, non dal tempo)
-  vec3 grainCol = blendNoise(outputColor.rgb, g, uNoiseMode);
-  outputColor.rgb = clamp(mix(outputColor.rgb, grainCol, uNoise), 0.0, 1.0);
+  // Guard bit-identico: a uNoise==0 il mix() e' un no-op, ma hash21+blendNoise venivano comunque
+  // calcolati. Saltandoli il risultato e' identico. NB: il clamp finale e' LOAD-BEARING (l'rgb
+  // pre-grana puo superare 1.0 e l'InkBleed a valle assume input in [0,1]) -> va fatto su ENTRAMBI i rami.
+  if (uNoise != 0.0) {
+    float g = hash21(floor(fragPx / max(uNoiseScale, 1.0))); // grana STATICA (dipende solo dal pixel, non dal tempo)
+    vec3 grainCol = blendNoise(outputColor.rgb, g, uNoiseMode);
+    outputColor.rgb = clamp(mix(outputColor.rgb, grainCol, uNoise), 0.0, 1.0);
+  } else {
+    outputColor.rgb = clamp(outputColor.rgb, 0.0, 1.0);
+  }
 }
 `;
 
@@ -642,6 +652,8 @@ export class AsciiEffect extends Effect {
     if (Array.isArray(v)) g.set(v[0], v[1]);
     else if (v && 'x' in v) g.set(v.x, v.y);
   }
+  // No-alloc: setta direttamente le componenti (evita di allocare un Vector2 per frame lato chiamante).
+  setGridSize(x, y) { this.uniforms.get('uGridSize').value.set(x, y); }
 
   // --- Resa glifo ---
   get glyphScale() { return this.uniforms.get('uGlyphScale').value; }
