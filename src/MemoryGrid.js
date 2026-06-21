@@ -53,6 +53,8 @@ uniform sampler2D uVideo;       // VideoTexture (sRGB)
 uniform vec2  uGridSize;        // numero celle (colonne, righe)
 uniform vec2  uCellPx;          // dimensione cella in pixel (drawing buffer) -> vec2 per sicurezza
 uniform vec2  uBufferPx;        // dimensione drawing buffer in pixel
+uniform vec2  uVideoScale;      // aspect-fit: scala UV schermo->video (1/scalaQuad), default (1,1)
+uniform vec2  uVideoOffset;     // aspect-fit: offset UV del video, default (0,0)
 uniform float uRate;            // velocita morph (unita colore/secondo)
 uniform float uDt;              // delta tempo reale clampato [0, 0.1]
 uniform bool  uReset;           // se true: scrive direttamente il bianco
@@ -89,7 +91,17 @@ void main() {
 
   // Centro cella nel video (stessa convenzione dell'effetto: (idx + 0.5) * cellPx / bufferPx).
   vec2 uvVideo = ((cellIndex + 0.5) * uCellPx) / uBufferPx;
-  vec3 target = srgbToLinear(texture2D(uVideo, uvVideo).rgb);
+  // Aspect-fit: stessa mappatura schermo->video usata dal quad (qui replicata a mano perche'
+  // campioniamo la VideoTexture con UV grezze, senza texture matrix).
+  uvVideo = (uvVideo - 0.5) * uVideoScale + 0.5 + uVideoOffset;
+  // Fuori dal frame video (bande lettera-box del 'contain') -> colore di sfondo (bianco), come il
+  // clear color del quad: cosi' quelle celle restano "vuote" nell'ASCII anziche' spalmare i bordi.
+  vec3 target;
+  if (uvVideo.x < 0.0 || uvVideo.x > 1.0 || uvVideo.y < 0.0 || uvVideo.y > 1.0) {
+    target = uInitColor;
+  } else {
+    target = srgbToLinear(texture2D(uVideo, uvVideo).rgb);
+  }
 
   // Colore precedente memorizzato (centro del texel della cella corrente).
   vec2 prevUv = (cellIndex + 0.5) / uGridSize;
@@ -148,6 +160,9 @@ export class MemoryGrid {
         // Soglie (EPS0, EPS1) dello smoothstep dell'attivita sulla luminanza residua.
         // Piccole e tarabili: sotto EPS0 = assestata (alpha 0), sopra EPS1 = pieno morph (alpha 1).
         uActEps: { value: new Vector2(0.01, 0.12) },
+        // Aspect-fit della VideoTexture (mappatura schermo->video, allineata alla scala del quad).
+        uVideoScale: { value: new Vector2(1, 1) },
+        uVideoOffset: { value: new Vector2(0, 0) },
       },
     });
     this.quad = new Mesh(new PlaneGeometry(2, 2), this.material);
@@ -231,6 +246,14 @@ export class MemoryGrid {
   // Re-inizializza esplicitamente la memoria a bianco (reset utente).
   reset() {
     this._needsInit = true;
+  }
+
+  // Imposta la trasformazione UV "cover" della VideoTexture (aspect-fit), allineata alla
+  // texture matrix del quad renderizzato cosi' la memoria campiona ESATTAMENTE lo stesso crop.
+  // sx/sy = scala (repeat), ox/oy = offset. (1,1,0,0) = nessuna trasformazione (default).
+  setVideoTransform(sx, sy, ox, oy) {
+    this.material.uniforms.uVideoScale.value.set(sx, sy);
+    this.material.uniforms.uVideoOffset.value.set(ox, oy);
   }
 
   // Esegue il pass di update per un frame e ritorna la texture col risultato (RT corrente).

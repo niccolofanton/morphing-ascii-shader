@@ -188,7 +188,7 @@ Credits / licenses of the demo sources included:
 - **Bad Apple!!** — the well-known Touhou shadow-art PV; copyright of its respective authors.
 - **Big Buck Bunny** — © Blender Foundation, [CC-BY 3.0](https://peach.blender.org/about/).
 - **Fragole** (strawberries) — sample clip.
-- **5 fiori** (5 flowers) — procedurally generated (see `tools/`).
+- **17 flowers** — procedurally generated (see `tools/`).
 
 ## License
 

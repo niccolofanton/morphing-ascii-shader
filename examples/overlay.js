@@ -69,7 +69,7 @@ export function createOverlay({ videos, currentSrc, paused = false, onSelect, on
   // Settings: mostra/nasconde il pannello Tweakpane.
   const settingsToggle = document.createElement('button');
   settingsToggle.className = 'settings-toggle';
-  settingsToggle.title = 'Mostra / nascondi pannello';
+  settingsToggle.title = 'Show / hide panel';
   settingsToggle.innerHTML = ICON_SETTINGS;
   settingsToggle.classList.toggle('active', settingsVisible);
   settingsToggle.addEventListener('click', () => {
@@ -80,7 +80,7 @@ export function createOverlay({ videos, currentSrc, paused = false, onSelect, on
 
   const playToggle = document.createElement('button');
   playToggle.className = 'play-toggle';
-  playToggle.title = 'Play / Pausa';
+  playToggle.title = 'Play / Pause';
   playToggle.innerHTML = paused ? ICON_PLAY : ICON_PAUSE;
   playToggle.addEventListener('click', () => {
     const nowPaused = onTogglePlay ? onTogglePlay() : !paused;
