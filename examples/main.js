@@ -160,6 +160,17 @@ function presetForSrc(src) {
 const canvas = document.getElementById('scene');
 const video = document.getElementById('video');
 
+// ALTEZZA della LARGE viewport (100vh / lvh). Su iOS Safari window.innerHeight riporta l'area
+// VISIBILE (che si restringe quando appare la barra URL), mentre 100vh = large viewport ed e'
+// COSTANTE al toggle della barra. Misuriamo 100vh con una probe e dimensioniamo il canvas su
+// quella: cosi' il canvas riempie sempre lo schermo (100vh, anche dietro la barra) e NON si
+// ridimensiona/ri-renderizza ad ogni comparsa/scomparsa della toolbar.
+const _vhProbe = document.createElement('div');
+_vhProbe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100vh;visibility:hidden;pointer-events:none';
+document.body.appendChild(_vhProbe);
+function viewportW() { return window.innerWidth; }
+function viewportH() { return _vhProbe.offsetHeight || window.innerHeight; }
+
 // --- Renderer ---
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 // Il devicePixelRatio puo CAMBIARE a runtime (finestra spostata su un monitor con dpr diverso,
@@ -167,7 +178,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPrefer
 // (cap a 2 per non esplodere il drawing buffer su display 3x) e lo riapplichiamo ad ogni resize.
 function pixelRatio() { return Math.min(window.devicePixelRatio || 1, 2); }
 renderer.setPixelRatio(pixelRatio());
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(viewportW(), viewportH());
 renderer.setClearColor(0xffffff, 1);
 
 // --- Camera ortografica per la quad a schermo intero (clip-space [-1,1]) ---
@@ -248,7 +259,7 @@ const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 composer.addPass(new EffectPass(camera, ascii));
 composer.addPass(new EffectPass(camera, inkBleed)); // ink bleed come pass separato dopo l'ASCII
-composer.setSize(window.innerWidth, window.innerHeight);
+composer.setSize(viewportW(), viewportH());
 
 // GATE del RenderPass: quando il suo output NON puo' raggiungere l'immagine finale, saltarlo e'
 // bit-identico (misurato: l'output ASCII e' byte-identico con scena reale o input qualsiasi).
@@ -287,9 +298,10 @@ function fitVideo() {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return; // metadata non ancora pronti: si rifa su 'loadedmetadata'
-  if (!window.innerWidth || !window.innerHeight) return; // finestra degenerata: evita /0 e scale 0.
+  const W = viewportW(), H = viewportH();
+  if (!W || !H) return; // finestra degenerata: evita /0 e scale 0.
   const videoAspect = vw / vh;
-  const screenAspect = window.innerWidth / window.innerHeight;
+  const screenAspect = W / H; // usa la LARGE viewport (lvh): coerente col canvas, stabile al toggle barra
   // Rapporto scala-x / scala-y necessario perche' la forma del quad su schermo == aspect del video.
   const r = videoAspect / screenAspect;
   const fit = videoFitMode();
@@ -313,12 +325,18 @@ video.addEventListener('loadedmetadata', fitVideo);
 fitVideo(); // tentativo immediato (se i metadata sono gia disponibili)
 
 // --- Resize ---
+// Dimensioniamo sulla LARGE viewport (viewportW/H). Su iOS la barra URL che appare/sparisce cambia
+// innerHeight ma NON la large viewport: con la guardia w/h invariati saltiamo il lavoro pesante
+// (re-size buffer + realloc memoria), evitando churn ad ogni toggle della toolbar. La card si
+// riposiziona da sola in CSS (dvh), senza toccare il canvas.
+let _lastW = 0, _lastH = 0;
 function onResize() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const w = viewportW();
+  const h = viewportH();
   if (!w || !h) return; // finestra degenerata (es. minimizzata): niente da fare, evita /0 e RT 0px.
+  if (w === _lastW && h === _lastH) return; // solo la toolbar e' cambiata: il canvas (lvh) resta uguale.
+  _lastW = w; _lastH = h;
   // Il devicePixelRatio puo essere cambiato (spostamento tra monitor / zoom): riallinealo SEMPRE.
-  // setPixelRatio + setSize -> ridimensiona il drawing buffer al nuovo dpr.
   renderer.setPixelRatio(pixelRatio());
   renderer.setSize(w, h);
   composer.setSize(w, h);
@@ -330,6 +348,9 @@ function onResize() {
   fitVideo();
 }
 window.addEventListener('resize', onResize);
+// Su iOS il viewport "large" diventa noto/cambia leggermente dopo il primo layout/orientamento:
+// orientationchange e un re-check ritardato riallineano canvas + fit senza intervento utente.
+window.addEventListener('orientationchange', () => setTimeout(onResize, 300));
 
 // --- Loop di rendering ---
 const clock = new THREE.Clock();

@@ -58,11 +58,24 @@
       user-select: none;
       font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
-    /* Canvas a tutta finestra. */
+    /* Canvas a tutta finestra, PINNATO (fixed): non scrolla mai e riempie sempre 100vh. */
     #scene {
-      display: block;
+      position: fixed;
+      top: 0; left: 0;
       width: 100vw;
       height: 100vh;
+    }
+    /* iOS / touch: rendiamo la pagina di poco piu' alta del viewport SOLO per permettere lo scroll
+       che fa MINIMIZZARE la barra URL di Safari (si comprime scrollando). Tutta la UI e' fixed:
+       scrollare non muove nulla, cambia solo l'altezza della barra (e la card fixed si riposiziona
+       da sola). Sul desktop la pagina resta NON scrollabile (overflow:hidden invariato). */
+    @media (pointer: coarse) {
+      /* overscroll-behavior:none -> niente rimbalzo elastico (rubber-band) ai bordi, ma lo scroll
+         "in range" resta (quindi la barra di Safari si minimizza ancora). Disabilita anche il
+         pull-to-refresh. Su iOS 16+ vale per il documento; se una versione lo ignora per il root,
+         il bounce non si elimina del tutto senza JS. */
+      html, body { height: auto; overflow: visible; overscroll-behavior: none; }
+      body { min-height: calc(100vh + 80px); overflow-x: hidden; }
     }
     /* Il video sorgente resta nascosto: lo usiamo solo come texture WebGL. */
     #video {
@@ -95,7 +108,12 @@
        perche il materiale resta chiaro: il testo scuro resta sempre leggibile. */
     .bottom-ui {
       position: fixed;
-      bottom: 24px; left: 50%;
+      left: 50%;
+      /* Su iOS moderno position:fixed ancora gia' all'area VISIBILE (sopra la barra di Safari),
+         quindi NON serve compensare la toolbar: la card resta bassa come su desktop. L'unico
+         accorgimento per iOS e' ridurre la coda dell'ombra (vedi @media pointer:coarse) cosi' non
+         finisce dietro la barra bianca. */
+      bottom: 24px;
       transform: translateX(-50%);
       z-index: 100;
       display: flex;
@@ -120,6 +138,20 @@
     }
     @keyframes bottomFadeUp { to { opacity: 1; transform: translateX(-50%) translateY(0); } }
     .bottom-ui { transform: translateX(-50%) translateY(8px); }
+
+    /* iOS / dispositivi touch: la barra di Safari (bianca, solida) sta a filo del fondo e tagliava
+       la coda dell'ombra. Alziamo la card di un filo (32px) e RIDUCIAMO la portata verso il basso
+       dell'ombra, cosi' resta tutta sopra la barra senza il taglio bianco netto. Il desktop tiene
+       l'ombra piena. */
+    @media (pointer: coarse) {
+      .bottom-ui {
+        bottom: 32px;
+        box-shadow:
+          0 8px 22px rgba(0, 0, 0, 0.16),
+          0 2px 8px rgba(0, 0, 0, 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.65);
+      }
+    }
 
     /* ===== Header row ===== */
     .bottom-header {
@@ -281,5 +313,10 @@
 
 
   <script type="module" src="main.js"></script>
+
+  <!-- POC test-suite "barra URL": diagnostico opt-in, attivo SOLO con ?diag (zero impatto in produzione). -->
+  <script type="module">
+    if (new URLSearchParams(location.search).has('diag')) import('./diag.js');
+  </script>
 </body>
 </html>
