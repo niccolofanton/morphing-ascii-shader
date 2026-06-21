@@ -140,6 +140,22 @@ const VIDEO_PRESETS = {
   },
 };
 
+// DEVICE → variante del preset. I 3 preset per-tab esistono in 2 varianti (6 in totale):
+//   - DESKTOP: i literal qui sopra (gridCss 18 / 18 / 20);
+//   - MOBILE : duplicato del desktop con la SOLA griglia DIMEZZATA (celle piu piccole = piu
+//     dettaglio sullo schermo piccolo) -> 9 / 9 / 10.
+// 'mobile' = puntatore touch (coarse, stabile alla rotazione) OPPURE viewport stretta (<=768px).
+function isMobile() {
+  return window.matchMedia('(pointer: coarse), (max-width: 768px)').matches;
+}
+// Ritorna il preset per il src nella variante adatta al device (mobile = desktop con gridCss/2).
+function presetForSrc(src) {
+  const base = VIDEO_PRESETS[src];
+  if (!base) return null;
+  if (!isMobile()) return base;
+  return { ...base, gridCss: Math.max(5, Math.round(base.gridCss / 2)) };
+}
+
 // --- Riferimenti DOM ---
 const canvas = document.getElementById('scene');
 const video = document.getElementById('video');
@@ -351,7 +367,7 @@ let overlayApi = null;
 // Ritorna true se per quel src esiste un preset. (ink/background sono oggetti -> clona per non
 // mutare il literal del preset quando l'utente poi tocca i color picker.)
 function applyVideoPreset(src) {
-  const preset = VIDEO_PRESETS[src];
+  const preset = presetForSrc(src); // variante desktop o mobile (griglia dimezzata) in base al device
   if (!preset) return false;
   Object.assign(PARAMS, JSON.parse(JSON.stringify(preset)));
   PARAMS.videoSrc = src; // garantisce coerenza col src richiesto
