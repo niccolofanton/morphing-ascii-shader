@@ -1,6 +1,6 @@
 {
   "name": "@niccolofanton/morphing-ascii-shader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Real-time ASCII / halftone post-processing effect for three.js + pmndrs/postprocessing: glyph-atlas luminance mapping, Sobel edge glyphs, per-cell temporal memory and SDF shape morphing.",
   "type": "module",
   "license": "MIT",
