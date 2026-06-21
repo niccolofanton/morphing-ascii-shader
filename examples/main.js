@@ -386,14 +386,17 @@ function togglePlay() {
   return shouldPause;
 }
 
-// Mostra/nasconde il pannello Tweakpane (bottone settings). Ritorna se ora e VISIBILE.
-let settingsVisible = true;
-function toggleSettings() {
-  settingsVisible = !settingsVisible;
-  // Driftpane sposta il pane dentro un container .driftpane-drag-container (draggabile):
-  // nascondiamo quello, cosi sparisce anche la maniglia di resize.
+// Mostra/nasconde il pannello Tweakpane (bottone settings). Nascosto di DEFAULT.
+let settingsVisible = false;
+// Allinea la visibilita del pannello al flag. Driftpane sposta il pane dentro un container
+// .driftpane-drag-container (draggabile): nascondiamo quello, cosi sparisce anche la maniglia.
+function applySettingsVisibility() {
   const root = pane.element.closest('.driftpane-drag-container') || pane.element;
   root.classList.toggle('tp-hidden', !settingsVisible);
+}
+function toggleSettings() {
+  settingsVisible = !settingsVisible;
+  applySettingsVisibility();
   return settingsVisible;
 }
 
@@ -723,6 +726,8 @@ if (!applyVideoPreset(PARAMS.videoSrc)) applyAll();
 updateColorDisabled();
 updateMorphDisabled();
 pane.refresh();
+// Pannello nascosto di default: applica lo stato iniziale al container Driftpane.
+applySettingsVisibility();
 
 // --- Bottom bar (branding + selettore video + play/pausa), sincronizzata col pannello ---
 overlayApi = createOverlay({
@@ -732,7 +737,7 @@ overlayApi = createOverlay({
   onSelect: (src) => selectVideo(src),
   onTogglePlay: () => togglePlay(),
   onToggleSettings: () => toggleSettings(),
-  settingsVisible: true,
+  settingsVisible: settingsVisible,
 });
 
 // --- Controlli da tastiera (scorciatoie rapide; restano sincronizzati col pannello) ---
