@@ -1,0 +1,23 @@
+# POC Maestro — invarianti "barra URL" su Safari iOS (simulatore).
+#
+# Pre-req:
+#   1) `npm run dev` sul Mac (Vite, porta 5173).
+#   2) un simulatore avviato: `xcrun simctl boot "iPhone 15"` (o apri l'app Simulator).
+# Il simulatore CONDIVIDE la rete dell'host -> `localhost` punta al Mac, niente 10.0.2.2.
+#
+# Nota: su Safari iOS la barra non si fa togglare in modo affidabile via script, ma non
+# serve: le probe lvh/svh nella pagina codificano gia' la geometria della barra, quindi
+# CANVAS_COVERS e CARD_VISIBLE sono valutati contro lo stato "barra visibile" comunque.
+#
+# Run:  maestro test .maestro/urlbar-ios.yaml
+appId: com.apple.mobilesafari
+---
+- launchApp
+- openLink:
+    link: "http://localhost:5173/?diag=1"
+
+- assertVisible: "MAESTRO-DIAG v1"
+- assertVisible: "ALL PASS"
+- assertVisible: "PASS CANVAS_COVERS.*"
+- assertVisible: "PASS CARD_VISIBLE.*"
+- takeScreenshot: "urlbar-ios"

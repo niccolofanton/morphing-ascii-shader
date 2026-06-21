@@ -1,0 +1,36 @@
+# POC Maestro — invarianti "barra URL" su Chrome Android (emulatore o device reale).
+#
+# Pre-req:
+#   1) `npm run dev` sul Mac (Vite, porta 5173).
+#   2) un emulatore avviato (`emulator -avd <nome>`) o un device collegato (`adb devices`).
+# Dall'EMULATORE standard l'host Mac si raggiunge a 10.0.2.2 (loopback dell'host).
+# Da DEVICE FISICO via USB usa l'IP LAN del Mac e avvia Vite con `npm run dev -- --host`.
+#
+# Run:  maestro test .maestro/urlbar-android.yaml
+appId: com.android.chrome
+---
+- openLink:
+    link: "http://10.0.2.2:5173/?diag=1"
+    browser: true
+
+# La pagina calcola gli invarianti e li stampa: aspetta che l'overlay compaia.
+- assertVisible: "MAESTRO-DIAG v1"
+- takeScreenshot: "urlbar-android-1-initial"
+
+# Stato 1 (barra URL visibile al primo load): tutti gli invarianti PASS.
+- assertVisible: "ALL PASS"
+- assertVisible: "PASS CANVAS_COVERS.*"
+- assertVisible: "PASS CARD_VISIBLE.*"
+
+# Toggla la barra: swipe su per farla collassare -> gli invarianti devono restare PASS
+# (il canvas e' dimensionato sulla large viewport e NON deve cambiare).
+- swipe:
+    direction: UP
+- assertVisible: "ALL PASS"
+- takeScreenshot: "urlbar-android-2-collapsed"
+
+# Riapri la barra: swipe giu' -> ancora PASS.
+- swipe:
+    direction: DOWN
+- assertVisible: "ALL PASS"
+- takeScreenshot: "urlbar-android-3-expanded"
