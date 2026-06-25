@@ -18,6 +18,12 @@ frosted-glass UI.
 
 <p align="center"><strong>▶ Live demo: <a href="https://m-ascii.niccolofanton.dev">m-ascii.niccolofanton.dev</a></strong></p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/@niccolofanton/morphing-ascii-shader"><img src="https://img.shields.io/npm/v/@niccolofanton/morphing-ascii-shader?color=cb3837&logo=npm" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/niccolofanton/morphing-ascii-shader" alt="License: MIT"></a>
+  <a href="https://github.com/niccolofanton/morphing-ascii-shader/stargazers"><img src="https://img.shields.io/github/stars/niccolofanton/morphing-ascii-shader?style=social" alt="GitHub stars"></a>
+</p>
+
 ## Install
 
 ```bash
@@ -87,7 +93,7 @@ TypeScript definitions are bundled (`types/index.d.ts`).
 ## Parameters
 
 Every parameter is documented in depth — type, default, range, what it does, its visual effect
-and interactions — **each with an animated GIF** showing exactly what it changes.
+and interactions — **most with an animated GIF** showing exactly what it changes.
 
 ### 📖 → [Full parameter reference with GIFs: `docs/PARAMETERS.md`](docs/PARAMETERS.md)
 
