@@ -621,6 +621,21 @@ function applyAll() {
 
 const pane = new Pane({ title: 'ASCII Shader' });
 
+// True while a serialized state is being REPLAYED into the pane. Tweakpane's importState()
+// writes through every binding and re-emits 'change', so the `videoSrc` handler fires again with
+// the restored value; without this flag it would re-apply that tab's hard-coded preset on top of
+// the state just restored, and every tweak saved on a non-default tab would be lost on reload.
+// Wrapping importState() guards the single choke point EVERY replay goes through (load restore,
+// preset applied from the menu, incoming shared link); a flag around createDriftpane() would
+// only cover the load restore. A user click on a tab never goes through here, so it keeps
+// applying that tab's look.
+let applyingState = false;
+const importStateRaw = pane.importState.bind(pane);
+pane.importState = (state) => {
+  applyingState = true;
+  try { return importStateRaw(state); } finally { applyingState = false; }
+};
+
 // --- Cartella: Griglia ---
 const fGrid = pane.addFolder({ title: 'Grid' });
 fGrid.addBinding(PARAMS, 'gridCss', { label: 'cell (css px)', min: 5, max: 144, step: 1 })
@@ -751,7 +766,21 @@ const fVideo = pane.addFolder({ title: 'Video' });
 fVideo.addBinding(PARAMS, 'videoSrc', {
   label: 'source',
   options: Object.fromEntries(VIDEOS.map((v) => [v.label, v.src])),
-}).on('change', (ev) => selectVideo(ev.value));
+}).on('change', (ev) => {
+  // A state replay (see `applyingState`) must NOT run the per-tab preset over the values it is
+  // restoring: it only has to follow the source, because the <video> element is not
+  // binding-backed. An unknown source is skipped so the missing asset is never requested: the
+  // stale-source fallback in onStateApplied runs right after and switches to the default.
+  if (applyingState) {
+    if (VIDEOS.some((v) => v.src === ev.value)) {
+      setVideoSource(ev.value);
+      if (overlayApi) overlayApi.setActiveVideo(ev.value);
+    }
+    return;
+  }
+  // User pick (dropdown): applying that tab's look is the point.
+  selectVideo(ev.value);
+});
 fVideo.addBinding(PARAMS, 'playbackRate', { label: 'speed', min: 0.1, max: 3.0, step: 0.05 })
   .on('change', (ev) => { video.playbackRate = ev.value; });
 fVideo.addBinding(PARAMS, 'paused', { label: 'paused' })
