@@ -761,6 +761,9 @@ fVideo.addBinding(PARAMS, 'paused', { label: 'paused' })
 // Una riga abilita le 4 feature; sostituisce la cartella "Preset / Stato" e tutta la
 // persistenza fatta a mano. Il menu "Preset" (in cima al pannello) offre salva / applica /
 // rinomina / esporta+importa JSON e resetta posizione.
+// Set as soon as Driftpane applies a persisted state (see onStateApplied): tells a RESTORED
+// load apart from a first load with nothing in localStorage.
+let stateApplied = false;
 dp = createDriftpane(pane, {
   storageNamespace: 'evoling-ascii-shader',
   draggable: true,
@@ -773,19 +776,28 @@ dp = createDriftpane(pane, {
   showThemeControl: true,
   showResetPosition: true,
   showDeletePreset: true,
+  // pane.importState() DOES re-fire the binding 'change' handlers (Tweakpane v4 writes the
+  // value through the binding and re-emits 'change' for every value that differs), so
+  // everything backed by a binding is already applied to the effect. Only what NO binding
+  // owns is left to do here.
+  onStateApplied: () => {
+    stateApplied = true;
+    // Persisted source no longer available (asset removed/renamed): fall back to the default.
+    if (!VIDEOS.some((v) => v.src === PARAMS.videoSrc)) {
+      PARAMS.videoSrc = DEFAULTS.videoSrc;
+      pane.refresh();
+    }
+    // The <video> element is not a binding: when the restored source equals the current one
+    // no 'change' fires, so load it here (setVideoSource is a no-op if unchanged).
+    setVideoSource(PARAMS.videoSrc);
+    if (overlayApi) overlayApi.setActiveVideo(PARAMS.videoSrc);
+  },
 });
 
-// Driftpane ha gia ripristinato lo stato salvato (valori + stato folder) via
-// pane.importState(), che NON rilancia gli handler 'change' delle singole binding:
-// riallineiamo l'effetto a PARAMS e l'abilitazione condizionale dei color picker.
-// Se la sorgente video salvata non esiste piu tra quelle disponibili, torniamo al default.
-if (!VIDEOS.some((v) => v.src === PARAMS.videoSrc)) PARAMS.videoSrc = DEFAULTS.videoSrc;
-// Applica il preset per-tab del video iniziale (la tab attiva deve mostrare il suo look anche
-// al primo caricamento). Fallback ad applyAll() se per quel src non esistesse un preset.
-if (!applyVideoPreset(PARAMS.videoSrc)) applyAll();
-updateColorDisabled();
-updateMorphDisabled();
-pane.refresh();
+// FIRST LOAD ONLY (nothing persisted): apply the per-tab preset of the initial video so the
+// active tab shows its look. On a restored load the saved values win - re-applying the preset
+// here would overwrite them.
+if (!stateApplied && !applyVideoPreset(PARAMS.videoSrc)) applyAll();
 // Pannello nascosto di default: applica lo stato iniziale al container Driftpane.
 applySettingsVisibility();
 
