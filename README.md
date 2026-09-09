@@ -1,5 +1,7 @@
 # ASCII Shader
 
+![ASCII Shader](docs/preview.gif)
+
 Real-time **ASCII / halftone** post-processing toolkit for
 [three.js](https://threejs.org/) + [`pmndrs/postprocessing`](https://github.com/pmndrs/postprocessing).
 Maps video (or any rendered scene) to a glyph atlas by luminance, with Sobel edge glyphs,
