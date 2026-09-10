@@ -1,7 +1,7 @@
 {
-  "name": "@niccolofanton/morphing-ascii-shader",
+  "name": "@niccolofanton/evolving-ascii-shader",
   "version": "1.0.1",
-  "description": "Real-time ASCII / halftone post-processing effect for three.js + pmndrs/postprocessing: glyph-atlas luminance mapping, Sobel edge glyphs, per-cell temporal memory and SDF shape morphing.",
+  "description": "Real-time ASCII/halftone post-processing toolkit: maps video or any scene onto a glyph atlas by luminance, with Sobel edges, per-cell temporal memory and SDF morphing.",
   "type": "module",
   "license": "MIT",
   "author": "Niccolò Fanton",
@@ -49,11 +49,14 @@
     "README.md"
   ],
   "scripts": {
-    "dev": "vite --config vite.config.demo.js",
-    "build": "vite build",
+    "dev": "node tools/launch-mobile.mjs",
+    "dev:android": "node tools/launch-mobile.mjs android",
+    "dev:ios": "node tools/launch-mobile.mjs ios",
+    "build": "vite build && vite build --config vite.config.demo.js",
     "build:demo": "vite build --config vite.config.demo.js",
     "preview": "vite preview --config vite.config.demo.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "serve": "vite --config vite.config.demo.js --host localhost"
   },
   "peerDependencies": {
     "postprocessing": ">=6.36.0",
@@ -65,5 +68,12 @@
     "three": "0.161.0",
     "tweakpane": "4.0.5",
     "vite": "^8.0.16"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24.0.0",
+      "onFail": "download"
+    }
   }
 }

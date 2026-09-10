@@ -1,0 +1,42 @@
+# POC Maestro — AZIONE + VERIFICA: cambia i 3 tab (preset) e controlla che non diano errori.
+#
+# Pattern:
+#   - AZIONE:   tapOn "<label tab>"  (Maestro tocca l'elemento per testo)
+#   - VERIFICA: la pagina con ?diag=1 mostra nell'overlay due righe che Maestro può leggere:
+#       PRESET <tab attivo>   -> conferma che il tab è cambiato
+#       PASS NO_JS_ERRORS ... -> conferma che NON ci sono errori JS (window.onerror / promise)
+#     (vedi examples/diag.js: cattura gli errori e li stampa come testo)
+#
+# Pre-req: dev server attivo (es. `npm run dev:android`) + emulatore/simulatore avviato.
+# Run Android:  maestro --device emulator-5554 test .maestro/tabs.yaml
+# Run iOS:      cambia appId in com.apple.mobilesafari e l'URL in http://localhost:5173/?diag=1
+appId: com.android.chrome
+---
+- openLink:
+    link: "http://10.0.2.2:5173/?diag=1"
+    browser: true
+- assertVisible: "MAESTRO-DIAG v1"
+
+# --- Tab 1: 17 flowers (di default è già attivo) ---
+- tapOn: "17 flowers"
+- assertVisible: "PRESET 17 flowers"      # il preset attivo è quello giusto
+- assertVisible: "PASS NO_JS_ERRORS.*"    # nessun errore JS finora
+- takeScreenshot: "tab-1-flowers"
+
+# --- Tab 2: bad apple ---
+- tapOn: "bad apple"
+- assertVisible: "PRESET bad apple"       # il cambio tab ha avuto effetto
+- assertVisible: "PASS NO_JS_ERRORS.*"    # il cambio non ha generato errori
+- takeScreenshot: "tab-2-badapple"
+
+# --- Tab 3: strawberries ---
+# Nota: su schermi stretti la barra dei preset scrolla in orizzontale e "strawberries"
+# può essere fuori vista. Se il tap fallisce, rivelala con uno swipe sulla barra:
+#   - swipe: { start: "80%, 88%", end: "20%, 88%" }
+- tapOn: "strawberries"
+- assertVisible: "PRESET strawberries"
+- assertVisible: "PASS NO_JS_ERRORS.*"
+- takeScreenshot: "tab-3-strawberries"
+
+# Verifica finale complessiva (tutti gli invarianti + nessun errore)
+- assertVisible: "ALL PASS"

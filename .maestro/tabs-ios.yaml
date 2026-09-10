@@ -1,0 +1,29 @@
+# POC Maestro — AZIONE + VERIFICA sui 3 tab, versione iOS (Safari simulatore).
+# Identico a tabs.yaml ma appId = Safari e URL = localhost (il simulatore condivide la rete host).
+# Bonus iOS: GPU vera -> lo shader si vede E l'overlay resta reattivo (niente trade-off).
+#
+# Run:  maestro --device <UDID-iPhone> test .maestro/tabs-ios.yaml
+#       UDID: xcrun simctl list devices booted | grep iPhone
+appId: com.apple.mobilesafari
+---
+- launchApp
+- openLink:
+    link: "http://localhost:5173/?diag=1"
+- assertVisible: "MAESTRO-DIAG v1"
+
+- tapOn: "17 flowers"
+- assertVisible: "PRESET 17 flowers"
+- assertVisible: "PASS NO_JS_ERRORS.*"
+- takeScreenshot: "ios-tab-1-flowers"
+
+- tapOn: "bad apple"
+- assertVisible: "PRESET bad apple"
+- assertVisible: "PASS NO_JS_ERRORS.*"
+- takeScreenshot: "ios-tab-2-badapple"
+
+- tapOn: "strawberries"
+- assertVisible: "PRESET strawberries"
+- assertVisible: "PASS NO_JS_ERRORS.*"
+- takeScreenshot: "ios-tab-3-strawberries"
+
+- assertVisible: "ALL PASS"

@@ -36,6 +36,11 @@
   let resizes = 0;
   addEventListener('resize', () => { resizes++; });
 
+  // Cattura errori JS della pagina -> per i test di interazione ("verifica che non diano errori").
+  const jsErrors = [];
+  addEventListener('error', (e) => jsErrors.push(e.message || String(e.error || 'error')));
+  addEventListener('unhandledrejection', (e) => jsErrors.push('promise: ' + ((e.reason && e.reason.message) || e.reason)));
+
   function compute() {
     const lvh = pLv.offsetHeight;
     const svh = pSv.offsetHeight;
@@ -87,12 +92,21 @@
       add('CARD_VISIBLE', false, '.bottom-ui assente');
     }
 
+    // [5] nessun errore JS catturato (window.onerror / promise rejection) — utile per i test di interazione
+    add('NO_JS_ERRORS', jsErrors.length === 0,
+        jsErrors.length ? `${jsErrors.length}: ${jsErrors[jsErrors.length - 1].slice(0, 50)}` : 'ok');
+
+    // preset attivo (per verificare il cambio tab)
+    const activePill = document.querySelector('.preset-pill.active');
+    const preset = activePill ? activePill.textContent.trim() : '(?)';
+
     const all = checks.every((c) => c.ok);
 
     const lines = [
       'MAESTRO-DIAG v1',
       `LVH ${lvh}  SVH ${svh}  DVH ${dvh}  BAR ${bar}`,
       `VV ${px(vvW)}x${px(vvH)}  DPR ${dpr}  RSZ ${resizes}`,
+      `PRESET ${preset}`,
       ...checks.map((c) => `${c.ok ? 'PASS' : 'FAIL'} ${c.id} | ${c.info}`),
       `ALL ${all ? 'PASS' : 'FAIL'}`,
     ];
