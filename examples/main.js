@@ -793,8 +793,16 @@ fVideo.addBinding(PARAMS, 'paused', { label: 'paused' })
 // Set as soon as Driftpane applies a persisted state (see onStateApplied): tells a RESTORED
 // load apart from a first load with nothing in localStorage.
 let stateApplied = false;
+const DRIFTPANE_NAMESPACE = 'evoling-ascii-shader';
+const driftpaneShareParam = `dp:${DRIFTPANE_NAMESPACE}`;
+const currentUrl = new URL(window.location.href);
+if (currentUrl.searchParams.has(driftpaneShareParam)) {
+  currentUrl.searchParams.delete(driftpaneShareParam);
+  window.history.replaceState(window.history.state, '', currentUrl.toString());
+}
 dp = createDriftpane(pane, {
-  storageNamespace: 'evoling-ascii-shader',
+  storageNamespace: DRIFTPANE_NAMESPACE,
+  urlSync: false,
   draggable: true,
   presetsEnabled: true,
   presetFolderTitle: 'Presets',
