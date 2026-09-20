@@ -813,20 +813,20 @@ dp = createDriftpane(pane, {
   showThemeControl: true,
   showResetPosition: true,
   showDeletePreset: true,
-  // pane.importState() DOES re-fire the binding 'change' handlers (Tweakpane v4 writes the
-  // value through the binding and re-emits 'change' for every value that differs), so
-  // everything backed by a binding is already applied to the effect. Only what NO binding
-  // owns is left to do here.
+  // pane.importState() only re-fires a binding handler when the imported value differs from
+  // its current PARAMS value. Values that match PARAMS defaults can still differ from the
+  // live effect constructor defaults, so always push the complete restored state to the
+  // shader here. `applyingState` keeps the video binding from applying a tab preset over it.
   onStateApplied: () => {
     stateApplied = true;
     // Persisted source no longer available (asset removed/renamed): fall back to the default.
     if (!VIDEOS.some((v) => v.src === PARAMS.videoSrc)) {
       PARAMS.videoSrc = DEFAULTS.videoSrc;
-      pane.refresh();
     }
-    // The <video> element is not a binding: when the restored source equals the current one
-    // no 'change' fires, so load it here (setVideoSource is a no-op if unchanged).
-    setVideoSource(PARAMS.videoSrc);
+    applyAll();
+    updateColorDisabled();
+    updateMorphDisabled();
+    pane.refresh();
     if (overlayApi) overlayApi.setActiveVideo(PARAMS.videoSrc);
   },
 });
